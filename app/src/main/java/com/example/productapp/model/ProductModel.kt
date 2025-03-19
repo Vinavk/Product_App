@@ -12,15 +12,15 @@ class ProductModel : ArrayList<ProductModel.ProductModelItem>() {
 
 
 data class ProductRequest(
-    val data: List<ProductItem>
+    val data: List<ProductItems>
 )
 
-data class ProductItem(
+data class ProductItems(
     val product_code: String,
     val product_name: String,
     val Product_Qty: Int,
-    val Rate: Double,
-    val Product_Amount: Double
+    val Rate: Int,
+    val Product_Amount: Int
 )
 
 

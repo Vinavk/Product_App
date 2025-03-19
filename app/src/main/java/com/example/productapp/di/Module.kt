@@ -1,7 +1,7 @@
 package com.example.productapp.di
 
+import com.example.productapp.model.Repository
 import com.example.productapp.retrofit.ApiService
-import com.example.productapp.viewmodel.Repository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,7 +27,7 @@ object Module {
 
     @Provides
     @Singleton
-    fun ProvideRepo(retrofit: ApiService): Repository{
+    fun ProvideRepo(retrofit: ApiService): Repository {
         return Repository(retrofit)
     }
 }

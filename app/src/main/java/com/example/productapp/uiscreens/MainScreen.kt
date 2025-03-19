@@ -1,55 +1,110 @@
 package com.example.productapp.uiscreens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardElevation
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.productapp.model.ProductItems
 import com.example.productapp.model.ProductModel
+import com.example.productapp.model.ProductRequest
+import com.example.productapp.ui.theme.Purple80
+import com.example.productapp.ui.theme.Delbtnclr
+import com.example.productapp.ui.theme.Savebtnclr
 import com.example.productapp.viewmodel.ProductViewModel
-import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductScreen(viewModel: ProductViewModel = hiltViewModel()) {
+fun ProductScreen(viewModel: ProductViewModel ) {
     val productList by viewModel.productList.collectAsState()
     val isLoading = remember { mutableStateOf(true) }
+    val productItems = remember { mutableStateListOf<ProductModel.ProductModelItem>() }
+    var context = LocalContext.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(true) {
         viewModel.fetchProducts(divisionCode = 258)
-        delay(500)
-        isLoading.value = false
+    }
+
+    LaunchedEffect(productList) {
+        if (productList.isNotEmpty()) {
+            productItems.clear()
+            productItems.addAll(productList)
+            isLoading.value = false
+        }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Product List") })
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFFCBABF7),
+                                Color(0xFF82D8F3)
+                            )
+                        )
+                    )
+            ) {
+                TopAppBar(
+                    title = { Text("Products") },
+                    colors = TopAppBarColors(containerColor = Color.Transparent, actionIconContentColor = Color.Transparent, navigationIconContentColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent, titleContentColor = Color.Black)
+
+                )
+            }
+        },
+        bottomBar = {
+            Button(
+                onClick = {
+                    if(productItems.isNotEmpty()){
+                        val updatedList = productItems.map { product ->
+                            var randomAmount = Random.nextInt(100,2500)
+                            ProductItems(
+                                product_code = product.product_code,
+                                product_name = product.product_name,
+                                Product_Qty = product.convQty.toIntOrNull()
+                                    ?: 0,
+                                Rate = randomAmount,
+                                Product_Amount = (product.convQty.toIntOrNull()
+                                    ?: 0) * randomAmount
+                            )
+                        }
+
+                        val productRequest = ProductRequest(data = updatedList)
+
+                        viewModel.saveProducts(divisionCode = 258, productRequest = productRequest)
+
+                    }
+                    else{
+                        Toast.makeText(context,"Nothing to Save", Toast.LENGTH_LONG).show()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                ,
+                colors = ButtonDefaults.buttonColors(containerColor = Savebtnclr)
+            ) {
+                Text("Save")
+            }
         }
     ) { paddingValues ->
         Box(
@@ -63,20 +118,30 @@ fun ProductScreen(viewModel: ProductViewModel = hiltViewModel()) {
                     CircularProgressIndicator()
                 }
 
-                productList.isEmpty().not() -> {
+                productItems.isNotEmpty() -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(productList) { product ->
-                            ProductItem(product)
+                        items(productItems) { product ->
+                            ProductItem(product, onQuantityChange = { newQty ->
+                                val index = productItems.indexOf(product)
+                                if (index != -1) {
+                                    productItems[index] = product.copy(convQty = newQty.toString())
+                                }
+                            },
+
+                                onDelete = {
+                                    productItems.remove(product)
+                                })
                         }
                     }
                 }
 
                 else -> {
-                    Text("No products available", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(" Products are Not Available", fontSize = 18.sp)
                 }
             }
         }
@@ -84,21 +149,118 @@ fun ProductScreen(viewModel: ProductViewModel = hiltViewModel()) {
 }
 
 @Composable
-fun ProductItem(product: ProductModel.ProductModelItem) {
-    Card(
+fun ProductItem(
+    product: ProductModel.ProductModelItem,
+    onQuantityChange: (Int) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var incrementValue by remember(product.product_code) { mutableStateOf(0) }
+    var decrementValue by remember(product.product_code) { mutableStateOf(0) }
+    var quantity by remember(product.product_code) {
+        mutableStateOf(product.convQty.toIntOrNull() ?: 0)
+    }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
-        shape = RoundedCornerShape(8.dp)
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(8.dp),
+                spotColor = Color.Gray,
+                ambientColor = Color.Black.copy(alpha = 0.2f)
+            )
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Purple80, Color(0xFF9575CD))
+                ),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Text(
+            text = product.product_name,
+            color = Color.White,
+            fontSize = 12.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(100.dp)
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .weight(1f)
+                .background(Color.Transparent)
         ) {
-            Text(text = "Name: ${product.product_name}", fontWeight = FontWeight.Bold)
-            Text(text = "Code: ${product.product_code}")
-            Text(text = "Unit: ${product.product_unit}")
-            Text(text = "Quantity: ${product.convQty}")
+            Text(
+                text = decrementValue.toString(),
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.width(30.dp),
+                textAlign = TextAlign.Center
+            )
+
+            Button(
+                onClick = {
+                    if (quantity > 0) {
+                        quantity -= 1
+                        decrementValue += 1
+                        onQuantityChange(quantity)
+                    }
+                },
+                modifier = Modifier.size(40.dp),
+                contentPadding = PaddingValues(0.dp),
+                shape = CircleShape
+            ) {
+                Text("-", fontSize = 18.sp)
+            }
+
+            Text(
+                text = quantity.toString(),
+                color = Color.White,
+                fontSize = 16.sp,
+                modifier = Modifier.width(30.dp),
+                textAlign = TextAlign.Center
+            )
+
+            Button(
+                onClick = {
+                    quantity += 1
+                    incrementValue += 1
+                    onQuantityChange(quantity)
+                },
+                modifier = Modifier.size(40.dp),
+                contentPadding = PaddingValues(0.dp),
+                shape = CircleShape
+            ) {
+                Text("+", fontSize = 18.sp)
+            }
+
+            Text(
+                text = incrementValue.toString(),
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.width(30.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+
+
+        Button(
+            onClick = {
+                incrementValue = 0
+                decrementValue = 0
+                onDelete()
+            },
+            colors = ButtonDefaults.buttonColors(Delbtnclr),
+            modifier = Modifier
+                .width(80.dp)
+                .height(35.dp)
+        ) {
+            Text("Delete", fontSize = 11.sp, color = Color.White)
         }
     }
 }
-

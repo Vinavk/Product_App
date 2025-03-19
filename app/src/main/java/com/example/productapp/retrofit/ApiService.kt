@@ -18,9 +18,11 @@ interface ApiService {
         @Query("divisionCode") divisionCode: Int
     ): Response<ProductModel>
 
-    @POST("native_Db_V13.php?axn=save/taskproddets")
-    suspend fun saveTaskProducts(
-        @Query("divisionCode") divisionCode: Int,
-        @Body request: ProductRequest
-    ): Response<ApiResponse>
+   @POST("native_Db_V13.php")
+   suspend fun saveTaskProducts(
+       @Query("axn") axn: String = "save/taskproddets",
+       @Query("divisionCode") divisionCode: Int,
+       @Body request: ProductRequest
+   ): Response<ApiResponse>
+
 }
